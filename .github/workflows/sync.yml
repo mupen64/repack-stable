@@ -6,7 +6,7 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  sync:
+  sync-nightly:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,4 +65,70 @@ jobs:
           git add beta/
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: sync beta artifacts [skip ci]"
+          git push
+
+  sync-stable:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Mupen64
+
+      - name: Get latest mupen64-rr-lua release
+        id: get-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ASSET_URL=$(gh api \
+            "repos/mupen64/mupen64-rr-lua/releases/latest" \
+            --jq '.assets[] | select(.name | startswith("mupen64")) | .browser_download_url')
+          echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Download and unpack mupen64 stable release
+        run: |
+          curl -fsSL "${{ steps.get-release.outputs.asset_url }}" -o mupen64-stable.zip
+          mkdir -p _mupen64tmp
+          unzip -o mupen64-stable.zip -d _mupen64tmp
+          mkdir -p stable
+          cp -rf _mupen64tmp/release-artifact/. stable/
+          rm -rf _mupen64tmp mupen64-stable.zip
+
+      # SM64LuaRedux
+
+      - name: Get latest SM64LuaRedux release tag
+        id: get-sm64-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api \
+            "repos/mupen64/SM64LuaRedux/releases/latest" \
+            --jq '.tag_name')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download and unpack SM64LuaRedux stable release
+        run: |
+          curl -fsSL \
+            "https://github.com/mupen64/SM64LuaRedux/archive/refs/tags/${{ steps.get-sm64-tag.outputs.tag }}.zip" \
+            -o sm64luaredux-stable.zip
+          mkdir -p _sm64stabletmp
+          unzip -o sm64luaredux-stable.zip -d _sm64stabletmp
+          mkdir -p stable/SM64LuaRedux
+          # The zip extracts to a single top-level folder; move its contents into place
+          TOP=$(ls _sm64stabletmp/)
+          cp -rf "_sm64stabletmp/$TOP/." stable/SM64LuaRedux/
+          rm -rf _sm64stabletmp sm64luaredux-stable.zip
+
+      - name: Commit and push changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add stable/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: sync stable releases [skip ci]"
           git push
