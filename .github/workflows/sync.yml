@@ -33,7 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p nightly
+          rm -rf nightly && mkdir nightly
           gh run download ${{ steps.get-run.outputs.run_id }} \
             --repo mupen64/mupen64-rr-lua \
             --name "mupen-release-nightly" \
