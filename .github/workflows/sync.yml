@@ -54,9 +54,8 @@ jobs:
         run: |
           mkdir -p nightly/SM64LuaRedux
           unzip -o sm64luaredux.zip -d _sm64tmp
-          # The zip extracts to SM64LuaRedux-main/; move its contents into place
-          shopt -s dotglob
-          mv _sm64tmp/SM64LuaRedux-main/* nightly/SM64LuaRedux/
+          # The zip extracts to SM64LuaRedux-main/; copy its contents into place
+          cp -rf _sm64tmp/SM64LuaRedux-main/. nightly/SM64LuaRedux/
           rm -rf _sm64tmp sm64luaredux.zip
 
       # ── Commit & push ─────────────────────────────────────────────────────
