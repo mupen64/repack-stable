@@ -33,11 +33,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          rm -rf nightly && mkdir nightly
+          mkdir -p _nightlytmp
           gh run download ${{ steps.get-run.outputs.run_id }} \
             --repo mupen64/mupen64-rr-lua \
             --name "mupen-release-nightly" \
-            --dir nightly
+            --dir _nightlytmp
+          mkdir -p nightly
+          cp -rf _nightlytmp/. nightly/
+          rm -rf _nightlytmp
 
       # SM64LuaRedux
 
