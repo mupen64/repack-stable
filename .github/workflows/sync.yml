@@ -71,6 +71,7 @@ jobs:
           git push
 
   sync-stable:
+    needs: sync-nightly
     runs-on: ubuntu-latest
     permissions:
       contents: write
