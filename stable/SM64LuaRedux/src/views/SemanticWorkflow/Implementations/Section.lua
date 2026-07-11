@@ -8,13 +8,15 @@
 ---@diagnostic disable-next-line:assign-type-mismatch
 local __impl = __impl
 
-function __impl.new(end_action, timeout)
+---@type SectionInputs
+local SectionInputs = dofile(views_path .. 'SemanticWorkflow/Definitions/SectionInputs.lua')
+
+function __impl.new(name)
     local tmp = {}
     CloneInto(tmp, Joypad.input)
     return {
-        end_action = end_action,
-        timeout = timeout,
-        inputs = { { tas_state = NewTASState(), joy = tmp } },
+        inputs = { SectionInputs.new() },
         collapsed = false,
+        name = name
     }
 end

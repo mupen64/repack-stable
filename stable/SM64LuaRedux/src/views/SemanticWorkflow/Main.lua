@@ -6,6 +6,8 @@
 
 dofile(views_path .. 'SemanticWorkflow/Version.lua')
 
+--#region helpers
+
 function CloneInto(destination, source)
     local changes = {}
     for k, v in pairs(source) do
@@ -30,6 +32,50 @@ function WriteAll(file, content)
     return content
 end
 
+function IndexOf(table, element)
+    local index = 1
+    for _, v in pairs(table) do
+        if v == element then
+            return index
+        end
+        index = index + 1
+    end
+    return nil
+end
+
+---Produces a new name from a base string by appending a number to avoid name collisions (always higher than the highest potential collision).
+---@param base string The desired name in case of no collision.
+---@param collision_candidates string[] Names that cannot be used.
+---@return string name A new name that does not collide with collision_candidates.
+function UniqueName(base, collision_candidates)
+    local collision_set = {}
+    local max_number = 0
+
+    -- Populate the collision set and highest number, if available
+    for _, name in ipairs(collision_candidates) do
+        collision_set[name] = true
+
+        -- Check for a number suffix
+        local suffix = name:match(base .. " (%d+)$")
+        if suffix then
+            local num = tonumber(suffix)
+            if num and num > max_number then
+                max_number = num
+            end
+        end
+    end
+
+    -- Check if the base name is available
+    if not collision_set[base] then
+        return base
+    end
+
+    -- Create a new unique name by appending one higher than the max
+    return base .. " " .. (max_number + 1)
+end
+
+--#endregion
+
 local UID = dofile(views_path .. 'SemanticWorkflow/SharedUIDs.lua')
 
 ---@type Project
@@ -43,53 +89,59 @@ SemanticWorkflowDialog = nil
 
 local ugui_icon_draw = ugui.standard_styler.draw_icon
 
+local custom_icons = { 'navigate_back', 'arrow_up', 'arrow_down', 'base_sheet', 'without_save', 'delete',
+    'next_page', 'previous_page', 'duplicate', 'action', 'clone_up', 'clone_down', 'merge_up', 'loop'}
+
 ugui.standard_styler.draw_icon = function(rectangle, color, visual_state, key)
-    if key == 'door_opening' then
-        rectangle = {
-            x = rectangle.x - rectangle.width * 0.5,
-            y = rectangle.y - rectangle.height * 0.5,
-            width = rectangle.width * 2,
-            height = rectangle.height * 2,
-        }
-        BreitbandGraphics.draw_image(rectangle, nil, views_path .. 'SemanticWorkflow/Resources/door_opening.png', color,
-            'linear')
-    else
-        ugui_icon_draw(rectangle, color, visual_state, key)
+    local postfix = Drawing.IsLightMode() and '' or '_light'
+    for _, icon in ipairs(custom_icons) do
+        if key == icon then
+            BreitbandGraphics.draw_image(rectangle, nil, views_path .. 'SemanticWorkflow/Resources/' .. key .. postfix .. '.png', color, 'linear')
+            return
+        end
     end
+    ugui_icon_draw(rectangle, color, visual_state, key)
 end
 
 local Tabs = dofile(views_path .. 'SemanticWorkflow/Tabs.lua')
 local selected_tab_index = 1
 
 local function draw_factory(theme)
+    local uid_counter = 0
+    local function next_uid()
+        local uid = UID.DrawTextBase + uid_counter
+        uid_counter = uid_counter + 1
+        return uid
+    end
+
     return {
         foreground_color = Drawing.foreground_color(),
         background_color = theme.background_color,
         font_size = theme.font_size * Drawing.scale * 0.75,
 
         text = function(self, rect, horizontal_alignment, text)
-            BreitbandGraphics.draw_text2({
+            ugui.label({
+                uid = next_uid(),
                 rectangle = rect,
                 text = text,
-                align_x = BreitbandGraphics.alignment[horizontal_alignment],
-                align_y = BreitbandGraphics.alignment.center,
-                aliased = theme.pixelated_text,
                 color = self.foreground_color,
                 font_size = self.font_size,
                 font_name = 'Consolas',
+                align_x = BreitbandGraphics.alignment[horizontal_alignment],
+                align_y = BreitbandGraphics.alignment.center,
             })
         end,
 
         small_text = function(self, rect, horizontal_alignment, text)
-            BreitbandGraphics.draw_text2({
+            ugui.label({
+                uid = next_uid(),
                 rectangle = rect,
                 text = text,
-                align_x = BreitbandGraphics.alignment[horizontal_alignment],
-                align_y = BreitbandGraphics.alignment.center,
-                aliased = theme.pixelated_text,
                 color = self.foreground_color,
                 font_size = self.font_size * 0.75,
                 font_name = 'Consolas',
+                align_x = BreitbandGraphics.alignment[horizontal_alignment],
+                align_y = BreitbandGraphics.alignment.center,
             })
         end,
     }
@@ -101,12 +153,12 @@ end
 ---
 ---@return SectionInputs|nil override The inputs to apply for the current frame.
 function CurrentSemanticWorkflowOverride()
-    local current_sheet = SemanticWorkflowProject:current()
-    return current_sheet and not SemanticWorkflowProject.disabled and current_sheet:evaluate_frame() or nil
+    local current_sheet = SemanticWorkflowProject.current
+    return current_sheet and current_sheet:evaluate_frame() or nil
 end
 
 return {
-    name = Locales.str('SEMANTIC_WORKFLOW_TAB_NAME'),
+    name = function() return Locales.str('SEMANTIC_WORKFLOW_TAB_NAME') end,
     draw = function()
         -- if we're showing any dialog, stop rendering anything else
         if SemanticWorkflowDialog ~= nil then
@@ -118,7 +170,7 @@ return {
 
         -- TODO: redesign which tabs to show when and how
         --       (particularly, 'Preferences' has no reason to be hidden when no project is loaded)
-        local project_loaded = SemanticWorkflowProject:current() ~= nil
+        local project_loaded = SemanticWorkflowProject.current ~= nil
         if not project_loaded then
             -- show only the project page if no project was loaded
             selected_tab_index = 1
@@ -127,7 +179,7 @@ return {
         selected_tab_index = ugui.tabcontrol({
             uid = UID.SelectTab,
             rectangle = grid_rect(0, 0, 6, 1),
-            items = project_loaded and lualinq.select(Tabs, function(e) return e.name end) or { Tabs[1].name },
+            items = project_loaded and lualinq.select(Tabs, function(e) return e.name() end) or { Tabs[1].name() },
             selected_index = selected_tab_index,
         }).selected_index
 

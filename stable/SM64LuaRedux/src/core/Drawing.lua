@@ -11,6 +11,12 @@ Drawing = {
     offset_stack = {},
 }
 
+local UID = UIDProvider.allocate_once('Drawing', function(enum_next)
+    return {
+        SettingListLabelBase = enum_next(64),
+    }
+end)
+
 function Drawing.size_up()
     Drawing.initial_size = wgui.info()
     Drawing.scale = (Drawing.initial_size.height - 23) / 600
@@ -84,7 +90,7 @@ function Drawing.pop_offset()
 end
 
 ---Draws a setting item list.
----@param items { text: string, func: fun(rect: Rectangle) }[] An array of setting items with their names and control spawning functions.
+---@param items { text: fun(): string, func: fun(rect: Rectangle) }[] An array of setting items with their names and control spawning functions.
 ---@param pos Vector2 The initial position of the settings list in grid coordinates.
 function Drawing.setting_list(items, pos)
     local theme = Styles.theme()
@@ -94,15 +100,16 @@ function Drawing.setting_list(items, pos)
     for i = 1, #items, 1 do
         local item = items[i]
 
-        BreitbandGraphics.draw_text(
-            grid_rect(pos.x, y, 8, 0.5),
-            'start',
-            'center',
-            { aliased = not theme.cleartype },
-            foreground_color,
-            theme.font_size * Drawing.scale * 1.25,
-            theme.font_name,
-            item.text)
+        ugui.label({
+            uid = UID.SettingListLabelBase + i,
+            rectangle = grid_rect(pos.x, y, 8, 0.5),
+            text = item.text(),
+            color = foreground_color,
+            font_size = theme.font_size * Drawing.scale * 1.25,
+            font_name = theme.font_name,
+            align_x = BreitbandGraphics.alignment['start'],
+            align_y = BreitbandGraphics.alignment.center,
+        })
 
         item.func(grid_rect(pos.x, y + 0.6, 4, 1))
 
@@ -110,8 +117,14 @@ function Drawing.setting_list(items, pos)
     end
 end
 
+function Drawing.IsLightMode()
+    local background_color = Styles.theme().background_color
+    local luminance = 0.299 * background_color.r + 0.587 * background_color.g + 0.114 * background_color.b
+    return luminance > 186
+end
+
 function Drawing.foreground_color()
-    return BreitbandGraphics.invert_color(Styles.theme().background_color)
+    return Drawing.IsLightMode() and BreitbandGraphics.hex_to_color('#000000') or BreitbandGraphics.hex_to_color('#FFFFFF')
 end
 
 function grid_rect(x, y, x_span, y_span, gap)
