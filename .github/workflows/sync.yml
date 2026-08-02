@@ -26,7 +26,7 @@ jobs:
         run: |
           ASSET_URL=$(gh api \
             "repos/mupen64/mupen64-rr-lua/releases/latest" \
-            --jq '.assets[] | select(.name | startswith("mupen64")) | .browser_download_url')
+            --jq '.assets[] | select(.name | startswith("mupen64-w32")) | .browser_download_url')
           echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
 
       - name: Download and unpack mupen64 stable release
